@@ -2,56 +2,65 @@ package main // Application belongs to the package, it's the package name of our
 
 import (
 	// Import package within the same module, defined in go.mod, by typing "module-name/package-name"
-	"fmt"     // Import package 'format' which is named 'fmt' - Go std. Library, search Go Standard Library for further packages
-	"strconv" // Import package 'strconv' which takes care of converting data into other types
+	"fmt" // Import package 'format' which is named 'fmt' - Go std. Library, search Go Standard Library for further packages
+	"sync"
+	"time"
 	// Import strings
 )
 
 // **** Variables and Constants ****
-const conferenceTickets = 50                // Static or Constant - don't use 'var' but 'const'
-var conferenceName = "Go Conference"        // Variables declared with 'var' at beginning
-var remainingTickets uint = 50              // Variable with type declared - after variable name
-var bookings = make([]map[string]string, 0) // Initializing a list (Slice) of maps creating it with 'make' and specifying a size after , like 0 - Curly braces like Slices here don't work.
-//											// Specifying a size won't matter but is required - being a Slice it will anyways grow in size automatically
+const conferenceTickets = 50         // Static or Constant - don't use 'var' but 'const'
+var conferenceName = "Go Conference" // Variables declared with 'var' at beginning
+var remainingTickets uint = 50       // Variable with type declared - after variable name
+var bookings = make([]UserData, 0)   // Initializing a list (Slice) of maps creating it with 'make' and specifying a size after , like 0 - Curly braces like Slices here don't work.
+//									 // Specifying a size won't matter but is required - being a Slice it will anyways grow in size automatically
 
 // **** Arrays and Slices ****
+// **** STRUCTS ****
+type UserData struct { // Declaring custom Type or Struct with keyword 'type' a struct with name UserData and data type 'struct'
+	firstName       string
+	lastName        string
+	email           string
+	numberOfTickets uint
+}
+
+// **** CONCURRENCY ****
+var wg = sync.WaitGroup{} // Declaring a wait group, which has three functions
 
 func main() { // Entry function
 	// **** Function call ****
 	greetUser() // Local function call with args
 
 	// **** Loops ****
-	for remainingTickets > 0 && len(bookings) < 50 { // Go has only 'for' loop
-		firstName, lastName, email, userTickets := getUserInput()
-		isValidName, isValidEmail, isValidTicketNumber := validateUserInput(firstName, lastName, email, userTickets) // you can reference another package with the . notation so packageName.Function()
+	firstName, lastName, email, userTickets := getUserInput()
+	isValidName, isValidEmail, isValidTicketNumber := validateUserInput(firstName, lastName, email, userTickets) // you can reference another package with the . notation so packageName.Function()
 
-		if isValidName && isValidEmail && isValidTicketNumber {
+	if isValidName && isValidEmail && isValidTicketNumber {
 
-			bookTicket(userTickets, firstName, lastName, email)
+		bookTicket(userTickets, firstName, lastName, email)
+		wg.Add(1) // Launches a number of threads that the main thread should wait for - should be exectured before creating a new thread - Number is the threads, in this case there is 'sendTicket' only, if there was a second the nunmber would be '2'
+		go sendTicket(userTickets, firstName, lastName, email)
 
-			firstNames := printFirstNames()
-			fmt.Printf("The first name of bookings are: %v\n", firstNames)
+		firstNames := printFirstNames()
+		fmt.Printf("The first name of bookings are: %v\n", firstNames)
 
-			if remainingTickets == 0 { // End program
-				fmt.Println("Our conference is booked out. Come back next year.")
-				break // Break exits the loop
-			}
-
-		} else { // Must be written like this
-			if !isValidName {
-				fmt.Println("First name or Last name you entered is too short")
-			}
-			if !isValidEmail {
-				fmt.Println("Email address you entered doesn't contain @ sign")
-
-			}
-			if !isValidTicketNumber {
-				fmt.Println("Number of tickets you entered is invalid")
-			}
-			continue // Continue exit from this element without executing the code afterwards and continues to the next element
+		if remainingTickets == 0 { // End program
+			fmt.Println("Our conference is booked out. Come back next year.")
 		}
 
+	} else { // Must be written like this
+		if !isValidName {
+			fmt.Println("First name or Last name you entered is too short")
+		}
+		if !isValidEmail {
+			fmt.Println("Email address you entered doesn't contain @ sign")
+
+		}
+		if !isValidTicketNumber {
+			fmt.Println("Number of tickets you entered is invalid")
+		}
 	}
+	wg.Wait()
 }
 
 func greetUser() {
@@ -66,7 +75,7 @@ func printFirstNames() []string {
 
 	for _, booking := range bookings { // for each, range returns index and value in 1st and 2nd position, we can ditch the index with a Blank Identifier '_'
 
-		firstNames = append(firstNames, booking["firstName"]) // Append the name to the slice of user data using built-in function 'append()'
+		firstNames = append(firstNames, booking.firstName) // Append the name to the slice of user data using built-in function 'append()'
 	}
 
 	return firstNames
@@ -94,12 +103,18 @@ func getUserInput() (string, string, string, uint) {
 func bookTicket(userTickets uint, firstName string, lastName string, email string) {
 	remainingTickets = remainingTickets - userTickets // Operations on variables - both must be same type 'uint' because math between types 'uint' and 'int' cannot work
 
-	var userData = make(map[string]string) // Create map for each time bookTicket is called by invoking the expression with 'make'
-	userData["firstName"] = firstName      // Assign to map creating 'firstName' key and assigning 'firstName' variable as value
-	userData["lastName"] = lastName
-	userData["email"] = email
-	// userTickets is handled with converting uint into a number character so a string
-	userData["numberOfTickets"] = strconv.FormatUint(uint64(userTickets), 10) // Using package 'strconv' we use a function to convert our 'uint' to 'string' as decimal number, it is converted using 'base10'
+	// var userData = make(map[string]string) // Create map for each time bookTicket is called by invoking the expression with 'make'
+	var userData = UserData{ // Create a struct based on the 'userData' struct declared on top of the file and assigns the values to it, like generating a Class
+		firstName:       firstName,
+		lastName:        lastName,
+		email:           email,
+		numberOfTickets: userTickets,
+	}
+	// userData["firstName"] = firstName // Assign to map creating 'firstName' key and assigning 'firstName' variable as value
+	// userData["lastName"] = lastName
+	// userData["email"] = email
+	// // userTickets is handled with converting uint into a number character so a string
+	// userData["numberOfTickets"] = strconv.FormatUint(uint64(userTickets), 10) // Using package 'strconv' we use a function to convert our 'uint' to 'string' as decimal number, it is converted using 'base10'
 	// In this case we use 'uint64' because 'strconv.FormatUint' expects a 'uint64' value in the parameters as input
 	// Use 'uint64' built-in function to convert
 
@@ -109,6 +124,15 @@ func bookTicket(userTickets uint, firstName string, lastName string, email strin
 
 	fmt.Printf("Thank you %v %v for booking %v tickets. You will receive a confirmation email at %v\n", firstName, lastName, userTickets, email)
 	fmt.Printf("%v tickets remaining for %v\n", remainingTickets, conferenceName)
+}
+
+func sendTicket(userTickets uint, firstName string, lastName string, email string) { 
+	time.Sleep(10 * time.Second)                                                       // Sleep 10 seconds blocking the process - we need Concurrency
+	var ticket = fmt.Sprintf("%v tickets for %v %v", userTickets, firstName, lastName) // This allows you to save the formatted output to a variable
+	fmt.Println("##############")
+	fmt.Printf("Sending ticket:\n %v \nto %v\n", ticket, email)
+	fmt.Println("##############")
+	wg.Done()
 }
 
 // Examples
@@ -125,6 +149,9 @@ func bookTicket(userTickets uint, firstName string, lastName string, email strin
 // bookings := []string{} 								// We can use all the ways to declare variables with it's alternatives mixed
 // var bookings []string 								// Slice init with no values and no size
 //
+// var bookings = make([]map[string]string, 0) 			// Initializing a list (Slice) of maps creating it with 'make' and specifying a size after , like 0 - Curly braces like Slices here don't work.
+//														// Specifying a size won't matter but is required - being a Slice it will anyways grow in size automatically
+//
 // ** APPENDING **
 //
 // bookings = append(bookings, firstName+" "+lastName) 	// Built-in Go Function that add elements at end of the slice and return updated slice value, grows the slice if more space is needed.
@@ -134,6 +161,11 @@ func bookTicket(userTickets uint, firstName string, lastName string, email strin
 // Annotation verbs (or placeholders) can be used with 'Printf' function to format variables passed in
 // '%v' is the default format, there are others available to display value
 // All verbs can be found here: https://pkg.go.dev/fmt#hdr-Printing
+
+// **** CHANNELS ****
+//
+// Allow for easy and safe communication between goroutines
+// Help when goroutines share data or are dependent on each other, mitigating concurrency issues
 
 // **** CONDITIONS ****
 //
@@ -162,6 +194,21 @@ func bookTicket(userTickets uint, firstName string, lastName string, email strin
 //
 // isValidName, isValidEmail, isValidTicketNumber := validateUserInput(firstName, lastName, email, userTickets, remainingTickets)
 //
+
+// **** GOROUTINES - THREADING & CONCURRENCY ****
+//
+// We need to instanciate different Threads for things that might take long time
+// This allows to not block the code if one function takes longer or blocks
+// To run something in a spearate thread simply use 'go' in front of the statement/expression
+// 'go' abstract the creation of a thread itself
+// With only 'go' the main thread (the application itself) exits and all the rest stops also.
+// WaitGroup waits for all the threads launched by the application to finish, it is part of the 'sync' package
+// Provides basic sync functionalities
+//
+// WaitGroup has 3 functions
+// waitGroupName.Add() = Sets number of goroutines to wait (increases the counter by the provided number) - parameter is number of threads, must be excuted before instancing with 'go' and the params is how many functions are instanced with threads in the same block
+// waitGroupName.Wait() = Wait for all threads specified in 'Add()', waits until counter is 0 - must be executed ad the end of the main thread in the main function
+// waitGroupName.Done() = Executed in the function that runs a sperate thread to tell it's over with it and the thread can be killed - must be put at end of logic in function
 
 // **** MAPS ****
 //
@@ -217,6 +264,11 @@ func bookTicket(userTickets uint, firstName string, lastName string, email strin
 // for index, value := range booking  { }
 // To do a 'for each' we need to use 'range' which iterates over elements for different data structures (not only array/slices)
 // For arrays and slices 'range' provids index and value for each element
+// ** ENDING LOOPS **
+//
+// continue // Continue exit from this element without executing the code afterwards and continues to the next element
+//
+// break // Break exits the loop
 
 // **** SCOPE ****
 //
@@ -250,6 +302,13 @@ func bookTicket(userTickets uint, firstName string, lastName string, email strin
 //
 // "Fields" splits string with whitespace as separator - Return slice with split elements
 // var names = strings.Fields(booking)
+
+// **** STRUCTS ****
+//
+// Collect different data types of data
+// Enables to to declare key, value pairs but with mixed data types
+// Define a custom Type where we can define what properties should have this structure
+// Like a Class but without inheritance
 
 // **** POINTERS ****
 //
